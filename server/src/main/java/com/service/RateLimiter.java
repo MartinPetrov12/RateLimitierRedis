@@ -22,11 +22,15 @@ public class RateLimiter {
 
     public boolean isAllowed(String key) {
         long now = Instant.now().getEpochSecond(); // Current timestamp
-
         String redisKey = "rate_limiter:" + key;
-
         // Remove outdated entries
         redis.zremrangebyscore(redisKey, "0", String.valueOf(now - window));
+
+        // Add the new request timestamp
+        redis.zadd(redisKey, now, String.valueOf(now));
+
+        // Set expiration for key
+        redis.expire(redisKey, window);
 
         // Count the remaining requests
         long count = redis.zcount(redisKey, "-inf", "+inf");
@@ -34,12 +38,6 @@ public class RateLimiter {
         if (count >= limit) {
             return false; // Rate limit exceeded
         }
-
-        // Add the new request timestamp
-        redis.zadd(redisKey, now, String.valueOf(now));
-
-        // Set expiration for key
-        redis.expire(redisKey, window);
 
         return true;
     }
